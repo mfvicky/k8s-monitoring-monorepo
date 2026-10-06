@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:alpine
+    container_name: redis-local
+    ports:
+      - '${REDIS_PORT}:6379'
+
+  service-a:
+    build:
+      context: .
+      dockerfile: services/service-a/Dockerfile
+    container_name: service-a
+    ports:
+      - '${SERVICE_A_PORT}:${SERVICE_A_PORT}'
+    env_file:
+      - .env
+    environment:
+      - PORT=${SERVICE_A_PORT}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - NODE_ENV=${NODE_ENV}
+    depends_on:
+      - redis
+
+  service-b:
+    build:
+      context: .
+      dockerfile: services/service-b/Dockerfile
+    container_name: service-b
+    ports:
+      - '${SERVICE_B_PORT}:${SERVICE_B_PORT}'
+    env_file:
+      - .env
+    environment:
+      - PORT=${SERVICE_B_PORT}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - NODE_ENV=${NODE_ENV}
+    depends_on:
+      - redis
+
+  service-c:
+    build:
+      context: .
+      dockerfile: services/service-c/Dockerfile
+    container_name: service-c
+    ports:
+      - '${SERVICE_C_PORT}:${SERVICE_C_PORT}'
+    env_file:
+      - .env
+    environment:
+      - PORT=${SERVICE_C_PORT}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - NODE_ENV=${NODE_ENV}
+    depends_on:
+      - redis
