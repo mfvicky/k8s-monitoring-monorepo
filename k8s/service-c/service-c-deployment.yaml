@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-c
+  namespace: monitoring-app
+  labels:
+    app: service-c
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-c
+  template:
+    metadata:
+      labels:
+        app: service-c
+    spec:
+      containers:
+        - name: service-c
+          image: service-c:1.0
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3002
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: PORT
+              value: '$(SERVICE_C_PORT)'
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '128Mi'
+            limits:
+              cpu: '250m'
+              memory: '256Mi'
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 10
+            periodSeconds: 10

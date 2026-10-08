@@ -1,31 +1,25 @@
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@latest --activate
 
+# Lock pnpm to your host's exact version (9.4.0)
+RUN corepack enable && corepack prepare pnpm@9.4.0 --activate
+
+# Copy workspace configuration and base setup
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+
+# Copy the service code (including src/)
 COPY services/service-a ./services/service-a
 
-RUN pnpm install --frozen-lockfile
-RUN pnpm --filter service-a build
+# Install all dependencies (including devDependencies like tsx)
+RUN pnpm install --frozen-lockfile --unsafe-perm
 
-FROM node:20-alpine AS runner
-WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
-# Declare build arguments with default fallbacks
 ARG PORT=3000
 ARG NODE_ENV=production
 
-# Assign to environment variables
 ENV PORT=${PORT}
 ENV NODE_ENV=${NODE_ENV}
 
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY services/service-a/package.json ./services/service-a/
-
-RUN pnpm install --prod --frozen-lockfile
-COPY --from=builder /app/services/service-a/dist ./services/service-a/dist
-
 EXPOSE ${PORT}
 
-CMD ["node", "services/service-a/dist/index.js"]
+# Run TypeScript directly using tsx via your service dev/start script
+CMD ["pnpm", "--filter", "service-a", "dev"]
