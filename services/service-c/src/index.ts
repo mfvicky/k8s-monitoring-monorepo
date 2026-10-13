@@ -1,11 +1,24 @@
 // Service C: Stats / Aggregator
-import express, { Request, Response } from 'express';
+import express, { Request, Response, Express } from 'express';
 import Redis from 'ioredis';
 import client from 'prom-client';
+import swaggerJSDoc from 'swagger-jsdoc';
+import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env';
 
-const app = express();
+const app: Express = express();
 app.use(express.json());
+
+// Swagger Setup
+const swaggerSpec = swaggerJSDoc({
+  definition: {
+    openapi: '3.0.0',
+    info: { title: 'Service C - Stats & Aggregator API', version: '1.0.0' },
+  },
+  apis: ['./src/index.ts'],
+});
+
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 const redis = new Redis({
   host: env.REDIS_HOST,
@@ -45,7 +58,15 @@ setInterval(async () => {
   }
 }, 3000);
 
-// GET /stats -> JSON summary endpoint
+/**
+ * @openapi
+ * /stats:
+ *   get:
+ *     summary: JSON summary of queue statistics and job statuses
+ *     responses:
+ *       200:
+ *         description: System statistics summary
+ */
 app.get('/stats', async (_req: Request, res: Response) => {
   try {
     const queueLength = await redis.llen('job_queue');
@@ -78,12 +99,28 @@ app.get('/stats', async (_req: Request, res: Response) => {
   }
 });
 
-// Health Probe Endpoint
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     summary: Stats service health check
+ *     responses:
+ *       200:
+ *         description: OK
+ */
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).send('OK');
 });
 
-// Prometheus Metrics Scraping Endpoint
+/**
+ * @openapi
+ * /metrics:
+ *   get:
+ *     summary: Prometheus metrics scraping endpoint
+ *     responses:
+ *       200:
+ *         description: Raw Prometheus metrics format
+ */
 app.get('/metrics', async (_req: Request, res: Response) => {
   res.setHeader('Content-Type', register.contentType);
   res.send(await register.metrics());
@@ -92,3 +129,11 @@ app.get('/metrics', async (_req: Request, res: Response) => {
 app.listen(env.PORT, () => {
   console.log(`[Service C] Stats service active on port ${env.PORT}`);
 });
+
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(env.PORT, () => {
+    console.log(`[Service C] Running on port ${env.PORT}`);
+  });
+}
+
+export default app;

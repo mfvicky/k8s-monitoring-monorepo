@@ -1,12 +1,25 @@
 // Service B: Worker (Scalable Service)
-import express, { Request, Response } from 'express';
+import express, { Request, Response, Express } from 'express';
 import Redis from 'ioredis';
 import bcrypt from 'bcryptjs';
 import client from 'prom-client';
+import swaggerJSDoc from 'swagger-jsdoc';
+import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env';
 
-const app = express();
+const app: Express = express();
 app.use(express.json());
+
+// Swagger Setup
+const swaggerSpec = swaggerJSDoc({
+  definition: {
+    openapi: '3.0.0',
+    info: { title: 'Service B - Worker Metrics API', version: '1.0.0' },
+  },
+  apis: ['./src/index.ts'],
+});
+
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 const redis = new Redis({
   host: env.REDIS_HOST,
@@ -101,12 +114,28 @@ async function startWorker(): Promise<void> {
   }
 }
 
-// Health and Readiness Probe Endpoints
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     summary: Worker health check
+ *     responses:
+ *       200:
+ *         description: OK
+ */
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).send('OK');
 });
 
-// Prometheus Metrics Scraping Endpoint
+/**
+ * @openapi
+ * /metrics:
+ *   get:
+ *     summary: Prometheus metrics endpoint
+ *     responses:
+ *       200:
+ *         description: Raw Prometheus metrics format
+ */
 app.get('/metrics', async (_req: Request, res: Response) => {
   res.setHeader('Content-Type', register.contentType);
   res.send(await register.metrics());
@@ -116,3 +145,11 @@ app.listen(env.PORT, () => {
   console.log(`[Service B] Worker metrics API active on port ${env.PORT}`);
   startWorker();
 });
+
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(env.PORT, () => {
+    console.log(`[Service B] Running on port ${env.PORT}`);
+  });
+}
+
+export default app;

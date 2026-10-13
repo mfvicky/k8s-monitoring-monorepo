@@ -1,11 +1,24 @@
 // Service A: API Gateway / Job Submitter
-import express, { Request, Response } from 'express';
+import express, { Request, Response, Express } from 'express';
 import Redis from 'ioredis';
 import { v4 as uuidv4 } from 'uuid';
+import swaggerJSDoc from 'swagger-jsdoc';
+import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env';
 
-const app = express();
+const app: Express = express();
 app.use(express.json());
+
+// Swagger Setup
+const swaggerSpec = swaggerJSDoc({
+  definition: {
+    openapi: '3.0.0',
+    info: { title: 'Service A - API Gateway', version: '1.0.0' },
+  },
+  apis: ['./src/index.ts'],
+});
+
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 const redis = new Redis({
   host: env.REDIS_HOST,
@@ -16,12 +29,37 @@ const redis = new Redis({
 redis.on('connect', () => console.log('[Service A] Connected to Redis'));
 redis.on('error', (err) => console.error('[Service A] Redis error:', err));
 
-// Health check endpoint
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     summary: Health check endpoint
+ *     responses:
+ *       200:
+ *         description: OK
+ */
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).send('OK');
 });
 
-// POST /submit -> Pushes job into Redis queue
+/**
+ * @openapi
+ * /submit:
+ *   post:
+ *     summary: Pushes job into Redis queue
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               payload:
+ *                 type: string
+ *     responses:
+ *       202:
+ *         description: Job accepted and pending
+ */
 app.post('/submit', async (req: Request, res: Response) => {
   try {
     const jobId = uuidv4();
@@ -42,7 +80,23 @@ app.post('/submit', async (req: Request, res: Response) => {
   }
 });
 
-// GET /status/:id -> Poll job status and result
+/**
+ * @openapi
+ * /status/{id}:
+ *   get:
+ *     summary: Poll job status and result
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Job details
+ *       404:
+ *         description: Job not found
+ */
 app.get('/status/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -63,3 +117,10 @@ app.get('/status/:id', async (req: Request, res: Response) => {
 app.listen(env.PORT, () => {
   console.log(`[Service A] Running on port ${env.PORT}`);
 });
+
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(env.PORT, () => {
+    console.log(`[Service A] Running on port ${env.PORT}`);
+  });
+}
+export default app;
