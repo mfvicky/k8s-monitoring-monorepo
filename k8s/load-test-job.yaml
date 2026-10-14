@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: load-tester
+  namespace: monitoring-app
+spec:
+  template:
+    spec:
+      containers:
+        - name: tester
+          image: node:20-alpine
+          command:
+            - 'node'
+            - '-e'
+            - |
+              async function run() {
+                console.log('Starting cluster-internal load test...');
+                const total = 5000;
+                const batchSize = 50;
+                for (let i = 0; i < total; i += batchSize) {
+                  const batch = Array.from({ length: Math.min(batchSize, total - i) }, (_, idx) =>
+                    fetch('http://service-a-svc:3000/submit', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ task: 'cluster-load-' + (i + idx) })
+                    }).catch((err) => { console.error('Request failed:', err.message); })
+                  );
+                  await Promise.all(batch);
+                  console.log('Sent up to ' + (i + batch.length) + ' jobs');
+                }
+                console.log('Load test completed.');
+                process.exit(0);
+              }
+              run();
+      restartPolicy: Never
